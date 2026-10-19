@@ -201,13 +201,25 @@ inquiry_text = ""  # TODO(#1): 위 영문 이메일로 교체
 
 def main():
     # --- 8. 체인 실행 및 결과 출력 ---
-    # combined_chain = build_combined_chain(llm) 로 체인을 만든 뒤,
-    # try-except 블록 안에서 실행하세요.
-    #   - combined_chain.invoke(input={'inquiry': inquiry_text}) 로 체인을 실행합니다.
-    #   - 결과 딕셔너리에서 .get()을 사용해 아래 값을 출력합니다. (없으면 "N/A")
-    #       translation, summary, urgency_score, language, reply1, reply2
-    #   - 예외 발생 시 f"Error: {e}" 형태로 오류 메시지를 출력합니다.
-    raise NotImplementedError("Issue #6: main")
+    combined_chain = build_combined_chain(llm)
+
+    try:
+        result = combined_chain.invoke(input={'inquiry': inquiry_text})
+
+        print("=" * 60)
+        print("[원본 문의]")
+        print(inquiry_text.strip())
+        print("=" * 60)
+        print(f"[1] 한국어 번역:\n{result.get('translation', 'N/A')}\n")
+        print(f"[2] 한 문장 요약:\n{result.get('summary', 'N/A')}\n")
+        print(f"[3] 긴급도 점수: {result.get('urgency_score', 'N/A')}\n")
+        print(f"[4] 원본 언어: {result.get('language', 'N/A')}\n")
+        print(f"[5] 고객 답변 (원본 언어):\n{result.get('reply1', 'N/A')}\n")
+        print(f"[6] 고객 답변 (한국어 번역):\n{result.get('reply2', 'N/A')}")
+        print("=" * 60)
+
+    except Exception as e:
+        print(f"Error: {e}")
 
 
 if __name__ == "__main__":
