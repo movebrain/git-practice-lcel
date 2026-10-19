@@ -88,7 +88,19 @@ def build_urgency_chain(llm):
     #   - 지시 내용: "다음 고객 문의를 읽고 처리 긴급도를 0점(여유)부터 10점(매우 긴급) 사이로
     #                평가하세요. 숫자만 대답하세요."
     # 단계 3: 긴급도 평가 체인 (프롬프트 | llm | StrOutputParser())
-    raise NotImplementedError("Issue #3: build_urgency_chain")
+
+    # 번역된 문의(translation)를 넣을 자리를 만든 프롬프트 문장
+    urgency_template = (
+        "다음 고객 문의를 읽고 처리 긴급도를 0점(여유)부터 10점(매우 긴급) 사이로 평가하세요. "
+        "숫자만 대답하세요.\n\n"  # 숫자만 받아야 나중에 점수로 쓰기 편함
+        "{translation}"  # 2단계에서 번역된 문의가 들어오는 자리
+    )
+    # 문자열에서 바로 프롬프트 템플릿 생성 (변수는 {translation} 하나)
+    urgency_prompt = PromptTemplate.from_template(urgency_template)
+    # 프롬프트 -> 모델 -> 문자열 결과 순서로 연결
+    urgency_chain = urgency_prompt | llm | StrOutputParser()
+    # 완성된 체인을 돌려줌 (결합은 #5에서 처리)
+    return urgency_chain
 
 
 def build_language_chain(llm):
@@ -96,20 +108,37 @@ def build_language_chain(llm):
     #   - 입력 변수: inquiry (번역본이 아닌 원본을 사용해야 함에 주의)
     #   - 지시 내용: "다음 이메일에 사용된 언어가 무엇인가요? 언어 이름만 답하세요."
     # 단계 4: 언어 식별 체인 (프롬프트 | llm | StrOutputParser())
-    raise NotImplementedError("Issue #3: build_language_chain")
+
+    # 언어를 알아내야 하니까 번역본 말고 원본(inquiry)을 넣음
+    language_template = (
+        "다음 이메일에 사용된 언어가 무엇인가요? 언어 이름만 답하세요.\n\n"  # 언어 이름만 받기
+        "{inquiry}"  # 고객이 보낸 원본 이메일 자리
+    )
+    # 원본 이메일을 받는 프롬프트 템플릿 생성
+    language_prompt = PromptTemplate.from_template(language_template)
+    # 프롬프트 -> 모델 -> 문자열 결과 순서로 연결
+    language_chain = language_prompt | llm | StrOutputParser()
+    # 답변 언어를 정할 때(#4) 쓰이도록 체인 반환
+    return language_chain
 
 
 # ==========================================================================
 # [Issue #4] 프롬프트 5·6 / 단계 5·6 - 답변 생성 체인, 답변 번역 체인
 # ==========================================================================
 
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+
 def build_reply1_chain(llm):
     # 프롬프트 5: 고객 답변 작성 (원본 언어로)
     #   - 입력 변수: language, summary
     #   - 지시 내용: "다음 고객 문의 요약에 대해 고객센터 담당자로서 정중한 답변을 작성하세요.
-    #                답변 언어:{language} / 문의 요약:{summary}"
-    # 단계 5: 답변 생성 체인 (프롬프트 | llm | StrOutputParser())
-    raise NotImplementedError("Issue #4: build_reply1_chain")
+    prompt5 = ChatPromptTemplate.from_template(
+        "다음 고객 문의 요약에 대해 고객센터 담당자로서 정중한 답변을 작성하세요.\n"
+        "답변 언어:{language} / 문의 요약:{summary}"
+    )
+    # 단계 5: 답변 생성 체인
+    return prompt5 | llm | StrOutputParser()
 
 
 def build_reply2_chain(llm):
@@ -117,7 +146,11 @@ def build_reply2_chain(llm):
     #   - 입력 변수: reply1
     #   - 지시 내용: "다음 답변을 한국어로 번역해주세요."
     # 단계 6: 답변 번역 체인 (프롬프트 | llm | StrOutputParser())
-    raise NotImplementedError("Issue #4: build_reply2_chain")
+    prompt6 = ChatPromptTemplate.from_template(
+        "다음 답변을 한국어로 번역해주세요.\n{reply1}"
+    )
+    # 단계 6: 답변 번역 체인
+    return prompt6 | llm | StrOutputParser()
 
 
 # ==========================================================================
@@ -145,7 +178,32 @@ def build_combined_chain(llm):
     #
     # [4단계] reply2 키 추가
     #   - reply2_chain 에 x["reply1"] 전달
-    raise NotImplementedError("Issue #5: build_combined_chain")
+    translate_chain = build_translate_chain(llm)
+    summarize_chain = build_summarize_chain(llm)
+    urgency_chain = build_urgency_chain(llm)
+    language_chain = build_language_chain(llm)
+    reply1_chain = build_reply1_chain(llm)
+    reply2_chain = build_reply2_chain(llm)
+
+    combined_chain = (
+        RunnablePassthrough.assign(
+            translation=lambda x: translate_chain.invoke(x["inquiry"])
+        )
+        | RunnablePassthrough.assign(
+            summary=lambda x: summarize_chain.invoke(x["translation"]),
+            urgency_score=lambda x: urgency_chain.invoke(x["translation"]),
+            language=lambda x: language_chain.invoke(x["inquiry"]),
+        )
+        | RunnablePassthrough.assign(
+            reply1=lambda x: reply1_chain.invoke(
+                {"language": x["language"], "summary": x["summary"]}
+            )
+        )
+        | RunnablePassthrough.assign(
+            reply2=lambda x: reply2_chain.invoke(x["reply1"])
+        )
+    )
+    return combined_chain
 
 
 # ==========================================================================
@@ -168,13 +226,25 @@ inquiry_text = ""  # TODO(#1): 위 영문 이메일로 교체
 
 def main():
     # --- 8. 체인 실행 및 결과 출력 ---
-    # combined_chain = build_combined_chain(llm) 로 체인을 만든 뒤,
-    # try-except 블록 안에서 실행하세요.
-    #   - combined_chain.invoke(input={'inquiry': inquiry_text}) 로 체인을 실행합니다.
-    #   - 결과 딕셔너리에서 .get()을 사용해 아래 값을 출력합니다. (없으면 "N/A")
-    #       translation, summary, urgency_score, language, reply1, reply2
-    #   - 예외 발생 시 f"Error: {e}" 형태로 오류 메시지를 출력합니다.
-    raise NotImplementedError("Issue #6: main")
+    combined_chain = build_combined_chain(llm)
+
+    try:
+        result = combined_chain.invoke(input={'inquiry': inquiry_text})
+
+        print("=" * 60)
+        print("[원본 문의]")
+        print(inquiry_text.strip())
+        print("=" * 60)
+        print(f"[1] 한국어 번역:\n{result.get('translation', 'N/A')}\n")
+        print(f"[2] 한 문장 요약:\n{result.get('summary', 'N/A')}\n")
+        print(f"[3] 긴급도 점수: {result.get('urgency_score', 'N/A')}\n")
+        print(f"[4] 원본 언어: {result.get('language', 'N/A')}\n")
+        print(f"[5] 고객 답변 (원본 언어):\n{result.get('reply1', 'N/A')}\n")
+        print(f"[6] 고객 답변 (한국어 번역):\n{result.get('reply2', 'N/A')}")
+        print("=" * 60)
+
+    except Exception as e:
+        print(f"Error: {e}")
 
 
 if __name__ == "__main__":
