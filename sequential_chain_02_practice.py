@@ -88,7 +88,19 @@ def build_urgency_chain(llm):
     #   - 지시 내용: "다음 고객 문의를 읽고 처리 긴급도를 0점(여유)부터 10점(매우 긴급) 사이로
     #                평가하세요. 숫자만 대답하세요."
     # 단계 3: 긴급도 평가 체인 (프롬프트 | llm | StrOutputParser())
-    raise NotImplementedError("Issue #3: build_urgency_chain")
+
+    # 번역된 문의(translation)를 넣을 자리를 만든 프롬프트 문장
+    urgency_template = (
+        "다음 고객 문의를 읽고 처리 긴급도를 0점(여유)부터 10점(매우 긴급) 사이로 평가하세요. "
+        "숫자만 대답하세요.\n\n"  # 숫자만 받아야 나중에 점수로 쓰기 편함
+        "{translation}"  # 2단계에서 번역된 문의가 들어오는 자리
+    )
+    # 문자열에서 바로 프롬프트 템플릿 생성 (변수는 {translation} 하나)
+    urgency_prompt = PromptTemplate.from_template(urgency_template)
+    # 프롬프트 -> 모델 -> 문자열 결과 순서로 연결
+    urgency_chain = urgency_prompt | llm | StrOutputParser()
+    # 완성된 체인을 돌려줌 (결합은 #5에서 처리)
+    return urgency_chain
 
 
 def build_language_chain(llm):
@@ -96,7 +108,18 @@ def build_language_chain(llm):
     #   - 입력 변수: inquiry (번역본이 아닌 원본을 사용해야 함에 주의)
     #   - 지시 내용: "다음 이메일에 사용된 언어가 무엇인가요? 언어 이름만 답하세요."
     # 단계 4: 언어 식별 체인 (프롬프트 | llm | StrOutputParser())
-    raise NotImplementedError("Issue #3: build_language_chain")
+
+    # 언어를 알아내야 하니까 번역본 말고 원본(inquiry)을 넣음
+    language_template = (
+        "다음 이메일에 사용된 언어가 무엇인가요? 언어 이름만 답하세요.\n\n"  # 언어 이름만 받기
+        "{inquiry}"  # 고객이 보낸 원본 이메일 자리
+    )
+    # 원본 이메일을 받는 프롬프트 템플릿 생성
+    language_prompt = PromptTemplate.from_template(language_template)
+    # 프롬프트 -> 모델 -> 문자열 결과 순서로 연결
+    language_chain = language_prompt | llm | StrOutputParser()
+    # 답변 언어를 정할 때(#4) 쓰이도록 체인 반환
+    return language_chain
 
 
 # ==========================================================================
