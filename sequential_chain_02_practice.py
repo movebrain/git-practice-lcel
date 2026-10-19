@@ -126,13 +126,19 @@ def build_language_chain(llm):
 # [Issue #4] 프롬프트 5·6 / 단계 5·6 - 답변 생성 체인, 답변 번역 체인
 # ==========================================================================
 
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+
 def build_reply1_chain(llm):
     # 프롬프트 5: 고객 답변 작성 (원본 언어로)
     #   - 입력 변수: language, summary
     #   - 지시 내용: "다음 고객 문의 요약에 대해 고객센터 담당자로서 정중한 답변을 작성하세요.
-    #                답변 언어:{language} / 문의 요약:{summary}"
-    # 단계 5: 답변 생성 체인 (프롬프트 | llm | StrOutputParser())
-    raise NotImplementedError("Issue #4: build_reply1_chain")
+    prompt5 = ChatPromptTemplate.from_template(
+        "다음 고객 문의 요약에 대해 고객센터 담당자로서 정중한 답변을 작성하세요.\n"
+        "답변 언어:{language} / 문의 요약:{summary}"
+    )
+    # 단계 5: 답변 생성 체인
+    return prompt5 | llm | StrOutputParser()
 
 
 def build_reply2_chain(llm):
@@ -140,7 +146,11 @@ def build_reply2_chain(llm):
     #   - 입력 변수: reply1
     #   - 지시 내용: "다음 답변을 한국어로 번역해주세요."
     # 단계 6: 답변 번역 체인 (프롬프트 | llm | StrOutputParser())
-    raise NotImplementedError("Issue #4: build_reply2_chain")
+    prompt6 = ChatPromptTemplate.from_template(
+        "다음 답변을 한국어로 번역해주세요.\n{reply1}"
+    )
+    # 단계 6: 답변 번역 체인
+    return prompt6 | llm | StrOutputParser()
 
 
 # ==========================================================================
