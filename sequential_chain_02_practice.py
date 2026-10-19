@@ -145,7 +145,32 @@ def build_combined_chain(llm):
     #
     # [4단계] reply2 키 추가
     #   - reply2_chain 에 x["reply1"] 전달
-    raise NotImplementedError("Issue #5: build_combined_chain")
+    translate_chain = build_translate_chain(llm)
+    summarize_chain = build_summarize_chain(llm)
+    urgency_chain = build_urgency_chain(llm)
+    language_chain = build_language_chain(llm)
+    reply1_chain = build_reply1_chain(llm)
+    reply2_chain = build_reply2_chain(llm)
+
+    combined_chain = (
+        RunnablePassthrough.assign(
+            translation=lambda x: translate_chain.invoke(x["inquiry"])
+        )
+        | RunnablePassthrough.assign(
+            summary=lambda x: summarize_chain.invoke(x["translation"]),
+            urgency_score=lambda x: urgency_chain.invoke(x["translation"]),
+            language=lambda x: language_chain.invoke(x["inquiry"]),
+        )
+        | RunnablePassthrough.assign(
+            reply1=lambda x: reply1_chain.invoke(
+                {"language": x["language"], "summary": x["summary"]}
+            )
+        )
+        | RunnablePassthrough.assign(
+            reply2=lambda x: reply2_chain.invoke(x["reply1"])
+        )
+    )
+    return combined_chain
 
 
 # ==========================================================================
