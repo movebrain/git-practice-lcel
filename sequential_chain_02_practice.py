@@ -66,7 +66,11 @@ def build_translate_chain(llm):
     #   - 입력 변수: inquiry
     #   - 지시 내용: "다음 고객 문의 이메일을 한국어로 번역하세요."
     # 단계 1: 번역 체인 (프롬프트 | llm | StrOutputParser())
-    raise NotImplementedError("Issue #2: build_translate_chain")
+    prompt1 = PromptTemplate(
+        input_variables=["inquiry"],
+        template="다음 고객 문의 이메일을 한국어로 번역하세요.\n\n{inquiry}",
+    )
+    return prompt1 | llm | StrOutputParser()
 
 
 def build_summarize_chain(llm):
@@ -75,7 +79,10 @@ def build_summarize_chain(llm):
     #   - 입력 변수: translation
     #   - 지시 내용: "다음 고객 문의를 한 문장으로 요약하세요."
     # 단계 2: 요약 체인 (프롬프트 | llm | StrOutputParser())
-    raise NotImplementedError("Issue #2: build_summarize_chain")
+    prompt2 = PromptTemplate.from_template(
+        "다음 고객 문의를 한 문장으로 요약하세요.\n\n{translation}"
+    )
+    return prompt2 | llm | StrOutputParser()
 
 
 # ==========================================================================
